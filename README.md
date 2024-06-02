@@ -6,7 +6,7 @@ Traditional garbage collectors used by languages such as Java employ a reference
 
 The code can be run on Eclipse by setting up the latest Soot and an approriate Java 8 JRE.
 
-Refer to our README file on running the docker image of the project. Find our docker image [here](https://drive.google.com/drive/u/0/folders/1FTbOu1n7D9wjnH09BDyQw5G0hySfthQh).
+Refer to our README file on running the docker image of the project. Find our docker image [here](https://drive.google.com/file/d/19KqJuMnPKXo6z77dGJkJQhE7vM8Yo9sK/view?usp=sharing).
 
 Find our report [here](https://drive.google.com/file/d/1Sq27zZ4AeQagUSnfBF0KMyOqrg6_xSvq/view?usp=drive_link)
 
