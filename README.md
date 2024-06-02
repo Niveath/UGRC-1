@@ -1,14 +1,5 @@
+# UGRC-1
 
-Run these in order
+# Compile-Time Memory Management
 
-- docker start soot-project
-- docker exec -it soot-project bash
-- export CLASSPATH=/usr/local/lib/soot/soot-4.4.1-jar-with-dependencies.jar:$CLASSPATH
-
-To run the java program
-
-- cd usr/local/src/
-- javac ugrc1/Driver.java ugrc1/callGraphAnalysis.java
-- java ugrc1/Driver
-
-
+Traditional garbage collectors used by languages such as Java employ a reference-based method to identify when objects can be safely killed and their memory reclaimed. This causes severe sub-optimal usage of memory as several objects that may be still referenced but no longer used are not collected by the garbage collector. Prior works such as [1] and [2] show that it is possible to such objects. While [1] is intra-procedural and [2] is complex, we present a easy to implement solution for this problem. We build a inter-procedural liveness analysis framework on top of a flow-insensitive and context-insensitive points-to analysis to identify dead objects. The objects are then freed by setting appropriate references to null explicitly. We implement our solution for Java using the Soot Compiler Optimization Framework and present its working for a few small programs.
