@@ -710,9 +710,7 @@ public class callGraphAnalysis extends SceneTransformer{
 					toRemove.add(u);
 			}
 			else {
-				if(!u.containingMethod.isJavaLibraryMethod()) {
-					methodReturns.put(u.containingMethod, u);
-				}
+				methodReturns.put(u.containingMethod, u);
 			}
 		}
 
