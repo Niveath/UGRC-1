@@ -1,4 +1,4 @@
-package ugrc1;
+package com.test;
 
 import java.util.*;
 import soot.PointsToAnalysis;
@@ -72,7 +72,7 @@ import soot.toolkits.graph.UnitGraph;
 import soot.javaToJimple.*;
 
 public class callGraphAnalysis extends SceneTransformer{
-	static boolean debug = false;
+	static boolean debug = true;
 	
 	class methodLocal {
 		SootMethod m;
@@ -252,6 +252,23 @@ public class callGraphAnalysis extends SceneTransformer{
 		}
 
 		createMethodGraph();
+		
+		if(debug) {
+			for(SootMethod sm: methodGraph.keySet()) {
+				// for each blockNode in the methodGraph, print successors
+				System.out.println("------------------------------------------------------------------------------------");
+				System.out.println("Method: " + sm);
+				for(blockNode bn: methodGraph.get(sm)) {
+					System.out.println("Unit: " + bn.unit + bn.unit.getTags().toString());
+					System.out.println("Successors: ");
+					for(blockNode succ: bn.succ) {
+						System.out.println("    " + succ.unit + succ.unit.getTags().toString());
+					}
+				}
+				System.out.println();
+			}
+			System.out.println("------------------------------------------------------------------------------------");
+		}
 
 		simplifyMethodGraphs();
 		
@@ -307,99 +324,6 @@ public class callGraphAnalysis extends SceneTransformer{
 		}
 		
 	}
-
-	void freeLinks(HashSet<Integer> killSet, SootMethod callerMethod){
-		if(debug)
-			System.out.println("-----------Caller Method: " + callerMethod + "start------------------");
-		for(Integer obj: killSet){
-			if(debug)
-				System.out.println("Freeing object " + obj + " in method " + callerMethod);
-			// get object,field pairs that are pointing to this object
-			if(object2object2.containsKey(obj)){
-				// list of all <f,O'> such that O'.f = O
-				PrintableHashMap<SootField, Vector<Integer>> fieldObjPair = object2object2.get(obj);
-				
-				for(SootField f: fieldObjPair.keySet()){
-					Vector<Integer> objects = fieldObjPair.get(f);
-					for(Integer o: objects){
-						// o.f = obj
-						Local local = findPointer(o, f, callerMethod);
-						if(debug)
-							System.out.println(local + "." + f + " = null in method " + callerMethod);
-						
-						SootFieldRef fieldRef = f.makeRef();
-						InstanceFieldRef fieldRefExpr = Jimple.v().newInstanceFieldRef(local, fieldRef);
-						
-						NullConstant nullConst = NullConstant.v();
-			            AssignStmt assignStmt = Jimple.v().newAssignStmt(fieldRefExpr, nullConst);
-			            
-			            if(debug)
-			            	System.out.println(assignStmt);
-			            
-						Body body = callerMethod.getActiveBody();
-						UnitPatchingChain units = body.getUnits();
-						Unit insertionPoint = methodReturns.get(callerMethod).unit; // Adjust this to the appropriate point in your method
-						units.insertBefore(assignStmt, insertionPoint);
-					}
-				}
-			}
-
-		}
-	}
-
-	Local findPointer(Integer obj, SootField f, SootMethod callerMethod){
-		Vector<methodLocal> locals = object2local.get(obj);
-		for(methodLocal ml: locals){
-			if(ml.m == callerMethod){
-				// check if the local is pointing to any other object
-				int localReturnable = 1;
-				if(local2object.containsKey(ml)){
-					Vector<Integer> objects = local2object.get(ml);
-					for(Integer o: objects){ 
-						if(o!=obj){
-							localReturnable = 0;
-							PrintableHashMap<SootField, Vector<Integer>> fieldObjPair = object2object2.get(obj);
-
-							for(SootField f1: fieldObjPair.keySet()){
-								Vector<Integer> objects1 = fieldObjPair.get(f1);
-								for(Integer o1: objects1){
-									Local temp = findPointer(o1, f1, callerMethod);
-									if(temp!=null){
-										// TO MODIFY
-										// newTemp = getNewTemp();
-										LocalGenerator lg = new DefaultLocalGenerator(callerMethod.getActiveBody());
-										Local newTempLocal = lg.generateLocal(RefType.v("java.lang.Object"));
-										
-										System.out.println(newTempLocal);
-
-										SootFieldRef fieldRef = f1.makeRef();
-										InstanceFieldRef fieldRefExpr = Jimple.v().newInstanceFieldRef(temp, fieldRef);
-										AssignStmt assignStmt = Jimple.v().newAssignStmt(newTempLocal, fieldRefExpr);
-
-										if(debug)
-											System.out.println("newTemp = " + temp + "." + f1);
-										
-										Body body = callerMethod.getActiveBody();
-										UnitPatchingChain units = body.getUnits();
-										Unit insertionPoint = methodReturns.get(callerMethod).unit;
-										units.insertBefore(assignStmt, insertionPoint);
-
-										return newTempLocal;
-									}
-								}
-							}
-						}
-					}
-				}
-				if(localReturnable==1){
-					return ml.l;
-				}
-			}
-		}
-		return null;
-	}
-
-
 	
 	
 	void iterateCFG(SootMethod rootMethod, PointsToAnalysis pta) {
@@ -786,7 +710,9 @@ public class callGraphAnalysis extends SceneTransformer{
 					toRemove.add(u);
 			}
 			else {
-				methodReturns.put(u.containingMethod, u);
+				if(!u.containingMethod.isJavaLibraryMethod()) {
+					methodReturns.put(u.containingMethod, u);
+				}
 			}
 		}
 
@@ -800,7 +726,7 @@ public class callGraphAnalysis extends SceneTransformer{
 			Boolean hasInvocation = false;
 			SootMethod calledMethod = null;
 			for(ValueBox vb : ((Stmt) bn.unit).getUseBoxes()) {
-				if(vb.getValue() instanceof InvokeExpr && !((InvokeExpr) vb.getValue()).getMethod().isConstructor()) {
+				if(vb.getValue() instanceof InvokeExpr && !((InvokeExpr) vb.getValue()).getMethod().isConstructor() && !((InvokeExpr) vb.getValue()).getMethod().isJavaLibraryMethod()) {
 					hasInvocation = true;
 					calledMethod = ((InvokeExpr) vb.getValue()).getMethod();
 					break;
@@ -817,8 +743,9 @@ public class callGraphAnalysis extends SceneTransformer{
 						returnNodes.add(methodReturns.get(sm));		
 				}
 				
-				for(blockNode rn : returnNodes)
+				for(blockNode rn : returnNodes) {
 					rn.succ.add(bn);
+				}
 			}
 		}
 	}
@@ -848,7 +775,7 @@ public class callGraphAnalysis extends SceneTransformer{
 				Boolean hasInvocation = false;
 				SootMethod invokedMethod = null;
 				for(ValueBox vb : s.getUseBoxes()) {
-					if(vb.getValue() instanceof InvokeExpr) {
+					if(vb.getValue() instanceof InvokeExpr && !((InvokeExpr) vb.getValue()).getMethod().isJavaLibraryMethod()) {
 						hasInvocation = true;
 						invokedMethod = ((InvokeExpr) vb.getValue()).getMethod();
 						break;
@@ -941,6 +868,127 @@ public class callGraphAnalysis extends SceneTransformer{
 
 			methodKilled.put(sm, killed);
 		}
+	}
+	
+	void freeLinks(HashSet<Integer> killSet, SootMethod callerMethod){
+		if(debug)
+			System.out.println("-----------Caller Method: " + callerMethod + "start------------------");
+		for(Integer obj: killSet){
+			if(debug)
+				System.out.println("Freeing object " + obj + " in method " + callerMethod);
+			// get object,field pairs that are pointing to this object
+			if(object2object2.containsKey(obj)){
+				// list of all <f,O'> such that O'.f = O
+				PrintableHashMap<SootField, Vector<Integer>> fieldObjPair = object2object2.get(obj);
+				
+				for(SootField f: fieldObjPair.keySet()){
+					Vector<Integer> objects = fieldObjPair.get(f);
+					for(Integer o: objects){
+						// o.f = obj
+						if(debug) System.out.println("Going to enter findPointer to free Object: " + o + " field: " + f);
+						Local local = findPointer(o, f, callerMethod);
+						if(debug)
+							System.out.println(local + "." + f + " = null in method " + callerMethod);
+						
+						// TODO: fix findPointer -> if null, needs to look at parent methods too, remove below after fixing it.
+						if(local==null) {
+							continue;
+						}
+						
+						SootFieldRef fieldRef = f.makeRef();
+						InstanceFieldRef fieldRefExpr = Jimple.v().newInstanceFieldRef(local, fieldRef);
+						
+						NullConstant nullConst = NullConstant.v();
+			            AssignStmt assignStmt = Jimple.v().newAssignStmt(fieldRefExpr, nullConst);
+			            
+			            if(debug)
+			            	System.out.println(assignStmt);
+			            
+						Body body = callerMethod.getActiveBody();
+						UnitPatchingChain units = body.getUnits();
+						Unit insertionPoint = methodReturns.get(callerMethod).unit; // Adjust this to the appropriate point in your method
+						units.insertBefore(assignStmt, insertionPoint);
+					}
+				}
+			}
+
+		}
+	}
+
+	Local findPointer(Integer obj, SootField f, SootMethod callerMethod){
+		Vector<methodLocal> locals = object2local.get(obj);
+		List<methodLocal> yetToCheckParent = new ArrayList<>();
+		for(methodLocal ml: locals){
+			if(ml.m == callerMethod){
+				// check if the local is pointing to any other object
+				int localReturnable = 1;
+				if(local2object.containsKey(ml)){
+					Vector<Integer> objects = local2object.get(ml);
+					for(Integer o: objects){ 
+						if(o!=obj){
+							yetToCheckParent.add(ml);
+							break;
+						}
+					}
+				}
+				if(localReturnable==1){
+					return ml.l;
+				}
+			}
+		}
+		
+		//TODO: fix not exactly solve infinite loop
+		
+		for(methodLocal ml: yetToCheckParent) {
+			if(ml.m == callerMethod){
+				// check if the local is pointing to any other object
+				int localReturnable = 1;
+				if(local2object.containsKey(ml)){
+					Vector<Integer> objects = local2object.get(ml);
+					for(Integer o: objects){ 
+						if(o!=obj){
+							localReturnable = 0;
+							PrintableHashMap<SootField, Vector<Integer>> fieldObjPair = object2object2.get(obj);
+
+							if(fieldObjPair != null) {
+								for(SootField f1: fieldObjPair.keySet()){
+									Vector<Integer> objects1 = fieldObjPair.get(f1);
+									for(Integer o1: objects1){
+										Local temp = findPointer(o1, f1, callerMethod);
+										if(temp!=null){
+											// TO MODIFY
+											// newTemp = getNewTemp();
+											LocalGenerator lg = new DefaultLocalGenerator(callerMethod.getActiveBody());
+											Local newTempLocal = lg.generateLocal(RefType.v("java.lang.Object"));
+	
+											SootFieldRef fieldRef = f1.makeRef();
+											InstanceFieldRef fieldRefExpr = Jimple.v().newInstanceFieldRef(temp, fieldRef);
+											AssignStmt assignStmt = Jimple.v().newAssignStmt(newTempLocal, fieldRefExpr);
+	
+											if(debug)
+												System.out.println("newTemp = " + temp + "." + f1);
+											
+											Body body = callerMethod.getActiveBody();
+											UnitPatchingChain units = body.getUnits();
+											Unit insertionPoint = methodReturns.get(callerMethod).unit;
+											units.insertBefore(assignStmt, insertionPoint);
+	
+											return newTempLocal;
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+				if(localReturnable==1){
+					return ml.l;
+				}
+			}
+		}
+		
+		
+		return null;
 	}
 
 }
