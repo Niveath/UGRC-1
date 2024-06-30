@@ -1,33 +1,16 @@
-package ugrc1;
+package com.test;
 
 import java.util.Arrays;
 
-import ugrc1.callGraphAnalysis2;
-
 import soot.PackManager;
 import soot.Transform;
+import soot.options.Options;
 
 public class Driver {
-	static boolean debug = false;
-	
 	public static void main (String [] args) {
 
 		String classPath = "tests";
-		String mainClass = "test";
-		if(args != null && args.length > 0) {
-			int i = 0;
-			while(true) {
-				if(args[i].equals("-cp")) {
-					classPath = args[i+1];
-					i += 2;
-				} else if (args[i].equals("-mainClass")) {
-					mainClass = args[i + 1];
-					i += 2;
-				}
-				
-				if(i + 1 > args.length) break;
-			}
-		}
+		String mainClass = "Prog";
 		
 		String [] sootArgs = {
 				"-v",
@@ -37,19 +20,17 @@ public class Driver {
 				"-src-prec", "c",
 				"-p", "cg.cha", "enabled:false",
 				"-p", "cg.spark", "enabled:true",
-				"-f", "J",
+				//"-f", "J",
 				//"-process-dir", classPath,
 				mainClass
 				
 		};
 		
-		if(debug) System.out.println("The soot arguments are " + Arrays.toString(sootArgs));
+		callGraphAnalysis pta = new callGraphAnalysis();
+		System.out.println("created object of pta!!");
 		
-		callGraphAnalysis cga = new callGraphAnalysis();
-		
-		PackManager.v().getPack("wjtp").add(new Transform("wjtp.cga", cga));
-		
+		PackManager.v().getPack("wjtp").add(new Transform("wjtp.mhpA", pta));
 		soot.Main.main(sootArgs);
+		
 	}
 }
-
